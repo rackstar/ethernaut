@@ -1,23 +1,31 @@
 import { BigNumber, Contract, Signer } from "ethers";
 import { ethers } from "hardhat";
-import { setupTest } from "./utils";
+import { setupChallenge, submitLevel } from "./utils";
+import { TOKEN_LEVEL_ADDRESS } from "./constants";
+import { expect } from "chai";
 
-let eoa: Signer;
-let accomplice: Signer;
-let challenge: Contract; // challenge contract
+// TODO: write the challenge description here
 
-// Setup challenge level instance, eoa, attacker and before/after hooks
-(async () => {
-  const contractLevel = "0x478f3476358Eb166Cb7adE4666d04fbdDB56C407";
-  const contractName = "Token";
-  ({  challenge } = await setupTest(contractLevel, { contractName }));
-  ([eoa, accomplice] = await ethers.getSigners())
-})();
+describe("Token", () => {
+  let eoa: Signer;
+  let accomplice: Signer;
+  let challenge: Contract;
 
-it("solves the challenge", async () => {
-  const eoaAddress = await eoa.getAddress();
-  const maxValue = BigNumber.from(2).pow(256)
-  // Since we're given an initial 20 tokens, subtract 21 from maxValue to prevent overflow
-  const tx = await challenge.connect(accomplice).transfer(eoaAddress, maxValue.sub(21));
-  await tx.wait();
+  before(async () => {
+    const contractLevel = TOKEN_LEVEL_ADDRESS;
+    const contractName = "Token";
+    ({ challenge } = await setupChallenge(contractLevel, { contractName }));
+    [eoa, accomplice] = await ethers.getSigners();
+  });
+
+  it("solves the challenge", async () => {
+    const eoaAddress = await eoa.getAddress();
+    const maxValue = BigNumber.from(2).pow(256);
+    // Since we're given an initial 20 tokens, subtract 21 from maxValue to extract maximum value and prevent overflow
+    await challenge.connect(accomplice).transfer(eoaAddress, maxValue.sub(21));
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });

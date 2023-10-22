@@ -1,7 +1,9 @@
 import { expect } from "chai";
-import { Contract, ContractTransaction, Signer } from "ethers";
+import { Contract } from "ethers";
+import { ethers } from "hardhat";
 import { HexString } from "../typings/global";
-import { setupTest } from "./utils";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
+import { VAULT_LEVEL_ADDRESS } from "./constants";
 
 /**
  * The password is stored in the contract storage with `private` visibility modifier.
@@ -11,28 +13,38 @@ import { setupTest } from "./utils";
  * @see: https://programtheblockchain.com/posts/2018/03/09/understanding-ethereum-smart-contract-storage/
  */
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
+/**
+ * Converts hex strings to UTF-8
+ */
+const hexToString = (hexString: HexString) => {
+  const hexNoPrefix = hexString.slice(2);
+  return Buffer.from(hexNoPrefix, "hex").toString("utf-8");
+};
 
-// Setup challenge level instance, eoa, attacker and before/after hooks
-(async () => {
-  const contractLevel = "0xB7257D8Ba61BD1b3Fb7249DCd9330a023a5F3670";
-  const contractName = "Vault";
-  ({ eoa, challenge } = await setupTest(contractLevel, { contractName }));
-})();
+describe("Vault", () => {
+  let challenge: Contract; // challenge contract
 
-it("solves the challenge", async () => {
-  // grab data from storage - slot 0 is locked, slot 1 is the password
-  const data = await eoa.provider?.getStorageAt(challenge.address, 1);
-  if (data) {
-    console.log(`password: ${hexToString(data)}`);
-    const tx: ContractTransaction = await challenge.unlock(data);
-    await tx.wait();
-  }
-  expect(await challenge.locked()).to.equal(false);
+  before(async () => {
+    const contractLevel = VAULT_LEVEL_ADDRESS;
+    const contractName = "Vault";
+    const options: TestOptions = { contractName };
+    ({ challenge } = await setupChallenge(contractLevel, options));
+  });
+
+  it("solves the challenge", async () => {
+    expect(await challenge.locked()).to.equal(true);
+
+    // grab data from storage - slot 0 is locked, slot 1 is the password
+    const data = await ethers.provider?.getStorageAt(challenge.address, 1);
+    if (data) {
+      console.log(`Password found: ${hexToString(data)}`);
+      await challenge.unlock(data);
+    }
+
+    expect(await challenge.locked()).to.equal(false);
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });
-
-function hexToString(hexString: HexString) {
-  const noPrefixHex = hexString.slice(2);
-  return Buffer.from(noPrefixHex, "hex").toString("utf-8");
-}

@@ -1,38 +1,41 @@
-import { Contract, ContractTransaction, Signer } from "ethers";
-import { setupTest } from "./utils";
+import { expect } from "chai";
+import { Contract, ContractTransaction } from "ethers";
+import { HELLO_LEVEL_ADDRESS } from "./constants";
+import { setupChallenge, submitLevel } from "./utils";
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
+describe("Hello", () => {
+  let challenge: Contract; // challenge contract
 
-const execute = async () => {
-  ({ eoa, challenge } = await setupTest(
-    "0x7E0f53981657345B31C59aC44e9c21631Ce710c7",
-    { abi: getAbi() }
-  ));
-};
+  before(async () => {
+    const contractlLevel = HELLO_LEVEL_ADDRESS;
+    const options = { abi: getAbi() };
+    ({ challenge } = await setupChallenge(contractlLevel, options));
+  });
 
-execute();
+  it("solves the challenge", async () => {
+    const infos = await Promise.all([
+      challenge.info(),
+      challenge.info1(),
+      challenge.info2("hello"),
+      challenge.infoNum(),
+      challenge.info42(),
+      challenge.theMethodName(),
+      challenge.method7123949(),
+    ]);
+    console.log(infos.join("\n"));
 
-it("solves the challenge", async () => {
-  const infos = await Promise.all([
-    challenge.info(),
-    challenge.info1(),
-    challenge.info2("hello"),
-    challenge.infoNum(),
-    challenge.info42(),
-    challenge.theMethodName(),
-    challenge.method7123949(),
-  ]);
-  console.log(infos.join("\n"));
+    const password = await challenge.password();
+    console.log(`password = ${password}`);
+    // can we somehow get it from constructor arguments? seems to accept a _password
+    // const deploymentTx = await eoa.provider.getTransaction("0x13a1170668283617adb31067592b50a3b2c01097ad28a10de08d78ced60215e3")
+    // console.log("Tx data:", deploymentTx.data, Buffer.from(deploymentTx.data, "hex").toString("utf8"))
 
-  const password = await challenge.password();
-  console.log(`password = ${password}`);
-  // can we somehow get it from constructor arguments? seems to accept a _password
-  // const deploymentTx = await eoa.provider.getTransaction("0x13a1170668283617adb31067592b50a3b2c01097ad28a10de08d78ced60215e3")
-  // console.log("Tx data:", deploymentTx.data, Buffer.from(deploymentTx.data, "hex").toString("utf8"))
+    await challenge.authenticate(password);
+  });
 
-  const tx: ContractTransaction = await challenge.authenticate(password);
-  await tx.wait();
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });
 
 /**

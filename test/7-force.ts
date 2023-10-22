@@ -1,5 +1,7 @@
 import { Contract } from "ethers";
-import { TestOptions, setupTest } from "./utils";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
+import { expect } from "chai";
+import { FORCE_LEVEL_ADDRESS } from "./constants";
 
 /**
  * For a smart contract written in Solidity to receive ether it requires a `payable` decorator in the function signature
@@ -14,19 +16,25 @@ import { TestOptions, setupTest } from "./utils";
  * @see https://consensys.github.io/smart-contract-best-practices/recommendations/#remember-that-ether-can-be-forcibly-sent-to-an-account
  */
 
-let attacker: Contract | undefined;
+describe("Force", () => {
+  let challenge: Contract;
+  let attacker: Contract | undefined;
 
-// Setup challenge level instance, eoa, attacker and before/after hooks
-(async () => {
-  const contractLevel = "0xb6c2Ec883DaAac76D8922519E63f875c2ec65575";
-  const contractName = "Force";
-  const attackerName = "ForceAttacker";
-  const options: TestOptions = { contractName, attackerName };
-  ({ attacker } = await setupTest(contractLevel, options));
-})();
+  before(async () => {
+    const contractLevel = FORCE_LEVEL_ADDRESS;
+    const options: TestOptions = {
+      contractName: "Force",
+      attackerName: "ForceAttacker",
+    };
+    ({ challenge, attacker } = await setupChallenge(contractLevel, options));
+  });
 
-it("solves the challenge", async () => {
-  // send 1 wei and execute attacker selfDestruct to force wei to Force contract
-  const txSelfDestruct = await attacker?.selfDestruct({ value: 1 });
-  await txSelfDestruct.wait();
+  it("solves the challenge", async () => {
+    // send 1 wei and execute attacker selfDestruct to force wei to Force contract
+    await attacker?.selfDestruct({ value: 1 });
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });

