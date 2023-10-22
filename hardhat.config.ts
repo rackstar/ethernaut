@@ -7,7 +7,7 @@ dotenv.config(); // load env vars from .env
 
 const { ARCHIVE_URL, MNEMONIC } = process.env;
 
-console.log(ARCHIVE_URL, MNEMONIC)
+console.log(ARCHIVE_URL, MNEMONIC);
 
 if (!ARCHIVE_URL)
   throw new Error(
@@ -23,7 +23,9 @@ const accounts = {
   mnemonic: MNEMONIC,
 };
 
-// Go to https://hardhat.org/config/ to learn more
+/**
+ * @see https://hardhat.org/config/ to learn more
+ */
 const config: HardhatUserConfig = {
   solidity: {
     compilers: [
