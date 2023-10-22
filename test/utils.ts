@@ -1,6 +1,7 @@
-import { expect } from "chai";
-import { BigNumber, Contract, ContractFactory, ContractTransaction, Signer } from "ethers";
-import hre, { ethers } from "hardhat";
+import { BigNumber, Contract, ContractTransaction, Signer } from "ethers";
+import { ethers } from "hardhat";
+
+const ETHERNAUT_ADDRESS_SEPOLIA = "0xa3e7317E591D5A0F1c605be1b3aC4D2ae56104d6";
 
 export type TestData = {
   eoa: Signer;
@@ -12,6 +13,7 @@ export type TestOptions = {
   contractName?: string; // either contractName or abi must be given
   abi?: any[]; // either contractName or abi must be given
   attackerName?: string;
+  value?: BigNumber;
 };
 
 // cached ethernautContract
@@ -21,7 +23,7 @@ const getEthernautContract = async (): Promise<Contract> => {
   if (!ethernautContract) {
     ethernautContract = await ethers.getContractAt(
       getEthernautAbi(),
-      getEthernautAddress()
+      ETHERNAUT_ADDRESS_SEPOLIA
     );
   }
   return ethernautContract;
@@ -71,9 +73,7 @@ export const createChallenge = async (
     // console.log(ethernaut, "calling createLevelInstances")
     let tx: ContractTransaction = await ethernaut.createLevelInstance(
       contractLevel,
-      {
-        value,
-      }
+      { value }
     );
     const { logs, blockNumber } = await tx.wait();
     // FIX: (no logs coming out)
@@ -108,69 +108,42 @@ export const createChallenge = async (
   }
 };
 
-/**
- * Setups the before and after hooks
- * Before hook - creates the challenge level instance, attacker contract, eoa
- * After hook - submits level and checks if the level was successfully solved
- * @param contractLevel
- * @param options
- * @returns
- */
-export const setupTest = (
+// TODO: JSdoc
+export const setupChallenge = async (
   contractLevel: HexString,
   options: TestOptions
 ): Promise<TestData> => {
-  return new Promise((resolve, reject) => {
-    let eoa: Signer;
-    let challenge: Contract; // challenge contract
-    let attacker: Contract | undefined;
-    let challengeFactory: ContractFactory | undefined;
+  let challenge: Contract; // challenge contract
+  let attacker: Contract | undefined;
 
-    before(async () => {
-      const { contractName, abi, attackerName } = options;
-      const [signers, challengeAddress] = await Promise.all([
-        ethers.getSigners(),
-        createChallenge(contractLevel),
-      ]);
+  // TODO: rewrite with before / after hooks not included
+  const { contractName, abi, attackerName, value } = options;
+  const [[eoa], challengeAddress] = await Promise.all([
+    ethers.getSigners(),
+    createChallenge(contractLevel, value),
+  ]);
 
-      // EOA
-      const [eoa] = signers;
+  // Create challenge
+  if (contractName) {
+    const challengeFactory = await ethers.getContractFactory(contractName);
+    challenge = await challengeFactory.attach(challengeAddress);
+  } else if (abi) {
+    challenge = await ethers.getContractAt(abi, challengeAddress);
+  } else {
+    throw new Error(
+      "Either options.contractName or options.abi must be passed"
+    );
+  }
 
-      // Create challenge
-      if (contractName) {
-        const challengeFactory = await ethers.getContractFactory(contractName);
-        challenge = await challengeFactory.attach(challengeAddress);
-      } else if (abi) {
-        challenge = await ethers.getContractAt(abi, challengeAddress);
-      } else {
-        reject(
-          new Error("Either options.contractName or options.abi must be passed")
-        );
-      }
+  // Create attacker contract if given
+  if (attackerName) {
+    const attackerFactory = await ethers.getContractFactory(attackerName);
+    // Pass the challenge contract address in attacker contract's constructor
+    attacker = await attackerFactory.deploy(challenge.address);
+  }
 
-      // Create attacker contract if given
-      if (attackerName) {
-        const attackerFactory = await ethers.getContractFactory(attackerName);
-        // Pass the challenge contract address in attacker contract's constructor
-        attacker = await attackerFactory.deploy(challenge.address);
-      }
-
-      resolve({ eoa, challenge, attacker });
-    });
-
-    after(async () => {
-      expect(await submitLevel(challenge.address), "level not solved").to.be
-        .true;
-    });
-  });
+  return { eoa, challenge, attacker };
 };
-
-/**
- * Sepolia Ethernaut Address
- */
-function getEthernautAddress() {
-  return "0xa3e7317E591D5A0F1c605be1b3aC4D2ae56104d6";
-}
 
 /**
  * ethernaut.abi - copied from the browser's console ethernaut object (ethernaut website)
