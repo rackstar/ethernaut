@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "es2020",
     "module": "commonjs",
+    "moduleResolution": "node",
     "strict": true,
     "outDir": "dist",
     "esModuleInterop": true,
@@ -11,5 +12,6 @@
     "typeRoots": ["./typings"]
   },
   "include": ["./scripts", "./test"],
+  "typeRoots": ["./typings"],
   "files": ["./hardhat.config.ts"]
 }
