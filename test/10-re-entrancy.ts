@@ -1,42 +1,49 @@
 import { expect } from "chai";
-import { BigNumber, Contract, Signer } from "ethers";
+import { Contract, utils } from "ethers";
 import { ethers } from "hardhat";
-import { createChallenge, submitLevel } from "./utils";
+import { REENTRANCY_LEVEL_ADDRESS } from "./constants";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
-let attacker: Contract | undefined;
+const { parseEther } = utils;
 
-before(async () => {
-  accounts = await ethers.getSigners();
-  [eoa] = accounts;
-  const challengeFactory = await ethers.getContractFactory("Reentrance");
-  const challengeAddress = await createChallenge(
-    "0x848fb2124071146990c7abE8511f851C7f527aF4",
-    ethers.utils.parseUnits("1", "ether")
-  );
-  challenge = await challengeFactory.attach(challengeAddress);
+describe("Re-entrancy", () => {
+  let challenge: Contract;
+  let attacker: Contract | undefined;
 
-  const attackerFactory = await ethers.getContractFactory("ReentranceAttacker");
-  attacker = await attackerFactory.deploy(challenge.address);
-});
-
-it("solves the challenge", async () => {
-  console.log(
-    "Challenge balance",
-    (await challenge.provider.getBalance(challenge.address)).toString()
-  );
-  tx = await attacker.attack({
-    value: ethers.utils.parseUnits("1", "ether"),
-    gasLimit: BigNumber.from("200000")
+  before(async () => {
+    const contractLevel = REENTRANCY_LEVEL_ADDRESS;
+    const options: TestOptions = {
+      contractName: "ReEntrancy",
+      attackerName: "ReEntrancyAttacker",
+      value: parseEther("1"),
+    };
+    ({ challenge, attacker } = await setupChallenge(contractLevel, options));
   });
-  await tx.wait();
-  console.log(
-    "Challenge balance",
-    (await challenge.provider.getBalance(challenge.address)).toString()
-  );
-});
 
-after(async () => {
-  expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  it("solves the challenge", async () => {
+    const donateAmount = parseEther("1");
+    const beforeContractBalance = await ethers.provider.getBalance(
+      challenge.address
+    );
+    expect(beforeContractBalance.toNumber()).to.be.greaterThan(0);
+
+    // 1. the attacker first donates to the vulnerable contract
+    // 2. executes withdraw
+    // 3. the receive function executes the re-entrancy attack (withdraws again before its balance is updated)
+    await attacker?.attack({ value: donateAmount });
+
+    const afterBalance = await ethers.provider.getBalance(challenge.address);
+    expect(afterBalance.toNumber()).to.be.equal(0);
+
+    const afterAttackerBalance = await ethers.provider.getBalance(
+      attacker!.address
+    );
+    expect(afterAttackerBalance).to.be.equal(
+      donateAmount.add(beforeContractBalance)
+    );
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });
