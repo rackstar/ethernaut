@@ -1,29 +1,31 @@
 import { expect } from "chai";
-import { BigNumber, Contract, Signer, utils } from "ethers";
-import { ethers } from "hardhat";
-import { createChallenge, submitLevel } from "./utils";
+import { Contract, Signer, utils } from "ethers";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
+import { KING_LEVEL_ADDRESS } from "./constants";
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
-let attacker: Contract | undefined;
+const { parseEther } = utils;
 
-before(async () => {
-  accounts = await ethers.getSigners();
-  [eoa] = accounts;
-  const challengeFactory = await ethers.getContractFactory("King");
-  const challengeAddress = await createChallenge(
-    "",
-    utils.parseUnits("1", "ether")
-  );
-  challenge = await challengeFactory.attach(challengeAddress);
+describe("King", () => {
+  let challenge: Contract; // challenge contract
+  let attacker: Contract | undefined;
 
-  const attackerFactory = await ethers.getContractFactory("KingAttacker");
-  attacker = await attackerFactory.deploy(challenge.address);
-});
+  before(async () => {
+    const contractLevel = KING_LEVEL_ADDRESS;
+    const options: TestOptions = {
+      contractName: "King",
+      attackerName: "KingAttacker",
+      value: parseEther("1"),
+    };
+    ({ challenge, attacker } = await setupChallenge(contractLevel, options));
+  });
 
-it("solves the challenge", async () => {
-});
+  it("solves the challenge", async () => {
+    // 1. send the same amount as the current prize to claim the throne
+    // 2. attacker contract will revert on receive causing the game to break
+    await attacker?.attack({ value: await challenge.prize() });
+  });
 
-after(async () => {
-  expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });
