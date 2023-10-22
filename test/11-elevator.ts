@@ -1,28 +1,27 @@
 import { expect } from "chai";
-import { BigNumber, Contract, Signer } from "ethers";
-import { ethers } from "hardhat";
-import { createChallenge, submitLevel } from "./utils";
+import { Contract } from "ethers";
+import { ELEVATOR_LEVEL_ADDRESS } from "./constants";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
-let attacker: Contract | undefined;
+describe("Elevator", () => {
+  let challenge: Contract; // challenge contract
+  let attacker: Contract | undefined;
 
-before(async () => {
-  accounts = await ethers.getSigners();
-  [eoa] = accounts;
-  const challengeFactory = await ethers.getContractFactory("Elevator");
-  const challengeAddress = await createChallenge(
-    "0xaB4F3F2644060b2D960b0d88F0a42d1D27484687"
-  );
-  challenge = await challengeFactory.attach(challengeAddress);
+  before(async () => {
+    const contractLevel = ELEVATOR_LEVEL_ADDRESS;
+    const options: TestOptions = {
+      contractName: "Elevator",
+      attackerName: "ElevatorAttacker",
+    };
+    ({ challenge, attacker } = await setupChallenge(contractLevel, options));
+  });
 
-  const attackerFactory = await ethers.getContractFactory("ElevatorAttacker");
-  attacker = await attackerFactory.deploy(challenge.address);
-});
+  it("solves the challenge", async () => {
+    // attacker implements `isLastFloor` returning false initially then true on succeeding calls
+    await attacker?.attack(1);
+  });
 
-it("solves the challenge", async () => {
-});
-
-after(async () => {
-  expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });
