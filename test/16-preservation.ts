@@ -1,29 +1,32 @@
 import { expect } from "chai";
-import { BigNumber, Contract, Signer } from "ethers";
-import { ethers } from "hardhat";
-import { createChallenge, submitLevel } from "./utils";
+import { Contract } from "ethers";
+import { TestOptions, setupChallenge, submitLevel } from "./utils";
 
-let eoa: Signer;
-let challenge: Contract; // challenge contract
-let attacker: Contract | undefined;
+describe("Preservation", () => {
+  let challenge: Contract;
+  let attacker: Contract | undefined;
 
-before(async () => {
-  accounts = await ethers.getSigners();
-  [eoa] = accounts;
-  const challengeFactory = await ethers.getContractFactory("Preservation");
-  const challengeAddress = await createChallenge(
-    "0x97E982a15FbB1C28F6B8ee971BEc15C78b3d263F"
-  );
-  challenge = await challengeFactory.attach(challengeAddress);
-  const attackerFactory = await ethers.getContractFactory(
-    "PreservationAttacker"
-  );
-  attacker = await attackerFactory.deploy(challenge.address);
-});
+  before(async () => {
+    const contractLevel = "0x7ae0655F0Ee1e7752D7C62493CEa1E69A810e2ed";
+    const contractName = "Preservation";
+    const attackerName = "PreservationAttacker";
+    const options: TestOptions = { contractName, attackerName };
+    ({ challenge, attacker } = await setupChallenge(contractLevel, options));
+  });
 
-it("solves the challenge", async () => {
-});
+  it("solves the challenge", async () => {
+    const challengeOwner = await challenge.owner();
 
-after(async () => {
-  expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+    // attacker contract will:
+    // 1. change the timeZone1Library to the PreservationAttackerLib address
+    // 2. make the Preservation contract call the PreservationAttackerLib to claim the contract
+    await attacker?.attack();
+
+    const newChallengeOwner = await challenge.owner();
+    expect(challengeOwner).to.not.equal(newChallengeOwner);
+  });
+
+  after(async () => {
+    expect(await submitLevel(challenge.address), "level not solved").to.be.true;
+  });
 });
