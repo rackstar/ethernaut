@@ -40,4 +40,6 @@ contract SimpleToken {
   function destroy(address payable _to) public {
     selfdestruct(_to);
   }
+
+  receive() external payable {}
 }
