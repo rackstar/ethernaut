@@ -21,7 +21,15 @@
 * [ ] Magic Number
 * [ ] Alien Codex
 * [ ] Denial
-* [ ] Shop
+* [x] Shop
+* [ ] Dex
+* [ ] Dex Two
+* [ ] Puzzle Wallet
+* [ ] Motorbike
+* [ ] Double Entry Point
+* [ ] Good Samaritan
+* [ ] Gatekeeper Three
+* [ ] Switch
 
 ## How to run tests
 
@@ -36,5 +44,8 @@ TODO
 ## Add Solidity linting
 
 TODO:
+
+add describe blocks
+add explanation on each tests
 
 use ethers 6 - BigInt
